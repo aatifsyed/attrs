@@ -4,3 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+proc-macro2 = { version = "1.0.94", default-features = false }
+syn = { version = "2.0.100", default-features = false, features = [
+    "parsing",
+    "derive",
+] }
+
+[dev-dependencies]
+syn = { version = "*", features = ["printing"] }
