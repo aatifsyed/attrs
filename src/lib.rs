@@ -34,15 +34,15 @@
 //! `#[attributes]` as they are used [in the Rust compiler](https://doc.rust-lang.org/reference/attributes.html#meta-item-attribute-syntax)
 //! and [in the wild](https://serde.rs/attributes.html) tend to look like this:
 //!
-// ! ```text
-// !   #[serde(rename_all = "...", untagged)]
-// ! // ^^^^^^ ^^^^^^^^^^   ^~~~^  ^^^^^^^^
-// ! //  path     key     =  val    key without val
-// !
-// !   #[repr(align(64))]
-// ! //  ^^^^ ^^^^^ ^^
-// ! //  path  key (val)
-// ! ```
+//! ```text
+//!   #[serde(rename_all = "...", untagged)]
+//! // ^^^^^^ ^^^^^^^^^^   ^~~~^  ^^^^^^^^
+//! //  path     key     =  val    key without val
+//!
+//!   #[repr(align(64))]
+//! //  ^^^^ ^^^^^ ^^
+//! //  path  key (val)
+//! ```
 //!
 //! You register different `key`s with an [`Attrs`] parser, along with a parsing function.
 //!
@@ -266,7 +266,7 @@ impl<'a> Attrs<'a> {
     /// followed by the appropriate combinator,
     /// separated by commas.
     ///
-    /// See [`as_parser`](Self::as_parser) for more.
+    /// See [crate documentation](mod@self) for more.
     pub fn parse(&mut self, input: ParseStream<'_>) -> syn::Result<()> {
         let mut msg = String::new();
         for (ix, key) in self
