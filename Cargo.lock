@@ -7,6 +7,8 @@ name = "attrs"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
+ "quote",
+ "strum-lite",
  "syn",
 ]
 
@@ -27,6 +29,12 @@ checksum = "1885c039570dc00dcb4ff087a89e185fd56bae234ddc7f056a945bf36467248d"
 dependencies = [
  "proc-macro2",
 ]
+
+[[package]]
+name = "strum-lite"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdbea1af582685244c1e75994dfedd9f2115d4a77714824320b774a2604c5da9"
 
 [[package]]
 name = "syn"

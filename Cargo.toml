@@ -11,4 +11,9 @@ syn = { version = "2.0.100", default-features = false, features = [
 ] }
 
 [dev-dependencies]
-syn = { version = "*", features = ["printing"] }
+quote = { version = "1.0.40", default-features = false }
+strum-lite = "0.1.1"
+syn = { version = "*", default-features = false, features = [
+    "printing",
+    "extra-traits",
+] }
