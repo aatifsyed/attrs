@@ -2,6 +2,17 @@
 name = "attrs"
 version = "0.1.0"
 edition = "2024"
+description = "An ergonomic parser library for `#[attributes]`, built on parser combinators."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/aatifsyed/attrs"
+documentation = "https://docs.rs/attrs"
+homepage = "https://crates.io/crates/attrs"
+categories = [
+    "rust-patterns",
+    "parsing",
+    "development-tools::procedural-macro-helpers",
+    "development-tools",
+]
 
 [dependencies]
 proc-macro2 = { version = "1.0.94", default-features = false }
