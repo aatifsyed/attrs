@@ -30,6 +30,15 @@ assert_eq!(path_to_serde.to_token_stream().to_string(), "custom :: path");
 `#[attributes]` as they are used [in the Rust compiler](https://doc.rust-lang.org/reference/attributes.html#meta-item-attribute-syntax)
 and [in the wild](https://serde.rs/attributes.html) tend to look like this:
 
+```text
+  #[serde(rename_all = "...", untagged)]
+// ^^^^^^ ^^^^^^^^^^   ^~~~^  ^^^^^^^^
+//  path     key     =  val    key without val
+
+  #[repr(align(64))]
+//  ^^^^ ^^^^^ ^^
+//  path  key (val)
+```
 
 You register different `key`s with an [`Attrs`] parser, along with a parsing function.
 
