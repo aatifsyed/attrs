@@ -1,6 +1,6 @@
 <!-- cargo-rdme start -->
 
-An ergonomic [`Parser`] library for `#[attributes]`, built on parser combinators.
+An ergonomic [`Parser`] for `#[attributes]`, built on parser combinators.
 
 ```rust
 let mut rename_all = None::<Casing>;
@@ -30,19 +30,19 @@ assert_eq!(path_to_serde.to_token_stream().to_string(), "custom :: path");
 `#[attributes]` as they are used [in the Rust compiler](https://doc.rust-lang.org/reference/attributes.html#meta-item-attribute-syntax)
 and [in the wild](https://serde.rs/attributes.html) tend to look like this:
 
-```text
-  #[serde(rename_all = "...", untagged)]
-// ^^^^^^ ^^^^^^^^^^   ^~~~^  ^^^^^^^^
-//  path     key     =  val    key without val
-
-  #[repr(align(64))]
-//  ^^^^ ^^^^^ ^^
-//  path  key (val)
+```rust
+  #[repr(align(128), C)]
+//  ^^^^ ^^^^^ ^^^   ^
+//  path  key (val)  bare key
+  #[serde(rename_all = "kebab-case", untagged)]
+// ^^^^^^ ^^^^^^^^^^   ^^^^^^^^^^^^  ^^^^^^^^
+//  path     key     =      val      bare key
 ```
 
-You register different `key`s with an [`Attrs`] parser, along with a parsing function.
+To use this library, create an [`Attrs`],
+and register different `key`s, each with a parsing function.
 
-This library provides several parsing functions, but there are four key kinds:
+This library provides many parsing functions, but there are four key kinds:
 - [`bool`](set::bool) takes a `true` or `false` from the input.
 - [`from_str`](set::from_str) takes a `".."` string from the input,
   before trying to [`FromStr`] it into an object.
