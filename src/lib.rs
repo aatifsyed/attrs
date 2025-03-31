@@ -61,7 +61,7 @@
 //! The [`on`] module acts on direct references,
 //! whereas the [`set`] module acts on [`Option`]s, filling them with [`Some`].
 //!
-//! The main ways to separate a key from its value are provided as combinators [`with`]:
+//! The main ways to separate a key from its value are provided as combinators in the [`with`] module:
 //! - [`with::eq`] take an `=` from the input.
 //! - [`with::paren`] take a group `(..)` from the input.
 //!
