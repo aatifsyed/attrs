@@ -1,4 +1,4 @@
-//! An ergonomic [`Parser`] library for `#[attributes]`, built on parser combinators.
+//! An ergonomic [`Parser`] for `#[attributes]`, built on parser combinators.
 //!
 //! ```
 //! # strum_lite::strum!( #[derive(PartialEq, Debug)] enum Casing { Kebab = "kebab-case", Snake = "snake_case" });
@@ -34,19 +34,21 @@
 //! `#[attributes]` as they are used [in the Rust compiler](https://doc.rust-lang.org/reference/attributes.html#meta-item-attribute-syntax)
 //! and [in the wild](https://serde.rs/attributes.html) tend to look like this:
 //!
-//! ```text
-//!   #[serde(rename_all = "...", untagged)]
-//! // ^^^^^^ ^^^^^^^^^^   ^~~~^  ^^^^^^^^
-//! //  path     key     =  val    key without val
-//!
-//!   #[repr(align(64))]
-//! //  ^^^^ ^^^^^ ^^
-//! //  path  key (val)
+//! ```
+//! # const _: &str = stringify! {
+//!   #[repr(align(128), C)]
+//! //  ^^^^ ^^^^^ ^^^   ^
+//! //  path  key (val)  bare key
+//!   #[serde(rename_all = "kebab-case", untagged)]
+//! // ^^^^^^ ^^^^^^^^^^   ^^^^^^^^^^^^  ^^^^^^^^
+//! //  path     key     =      val      bare key
+//! # };
 //! ```
 //!
-//! You register different `key`s with an [`Attrs`] parser, along with a parsing function.
+//! To use this library, create an [`Attrs`],
+//! and register different `key`s, each with a parsing function.
 //!
-//! This library provides several parsing functions, but there are four key kinds:
+//! This library provides many parsing functions, but there are four key kinds:
 //! - [`bool`](set::bool) takes a `true` or `false` from the input.
 //! - [`from_str`](set::from_str) takes a `".."` string from the input,
 //!   before trying to [`FromStr`] it into an object.
@@ -86,25 +88,25 @@ use syn::{
     parse::{Parse, ParseStream, Parser},
 };
 
-/// Ergonomic parser for `#[attributes]`.
+/// Ergonomic [`Parser`] for `#[attributes]`.
 ///
 /// See [crate documentation](mod@self) for more.
 ///
-/// Note that this struct implements [`Parser`]:
 /// ```
 /// # fn main() -> syn::Result<()> {
 /// # use attrs::*;
-/// # use syn::*;
-/// use syn::parse::Parser as _;
-///
 /// let mut untagged = false;
-/// let mut krate = None::<Path>;
+/// let mut krate = None::<syn::Path>;
 ///
-/// Attrs::new()
-///     .once("untagged", set::flag(&mut untagged))
-///     .once("crate", with::eq(set::parse_str(&mut krate)))
-///     .parse_str(r#"untagged, crate = "path::to::serde""#)?;
-/// //   ^^^^^^^^^
+/// let parseme: syn::Attribute = syn::parse_quote! {
+///     #[serde(untagged, crate = "path::to::serde")]
+/// };
+///
+/// parseme.parse_args_with(
+///     Attrs::new()
+///         .once("untagged", set::flag(&mut untagged))
+///         .once("crate", with::eq(set::parse_str(&mut krate)))
+/// )?;
 ///
 /// assert!(krate.is_some() && untagged);
 /// # Ok(()) }
@@ -210,7 +212,7 @@ impl<'a> Attrs<'a> {
     {
         for attr in attrs {
             if attr.path().is_ident(path) {
-                attr.parse_args_with(self.as_parser())?
+                attr.parse_args_with(&mut *self)?
             }
         }
         Ok(())
@@ -250,7 +252,7 @@ impl<'a> Attrs<'a> {
         let mut e = None;
         attrs.retain(|attr| match attr.path().is_ident(path) {
             true => {
-                match (e.as_mut(), attr.parse_args_with(self.as_parser())) {
+                match (e.as_mut(), attr.parse_args_with(&mut *self)) {
                     (_, Ok(())) => {}
                     (None, Err(e2)) => e = Some(e2),
                     (Some(e1), Err(e2)) => e1.combine(e2),
@@ -265,9 +267,7 @@ impl<'a> Attrs<'a> {
     /// Parse the entirety of input as a sequence of registered `key`s,
     /// followed by the appropriate combinator,
     /// separated by commas.
-    ///
-    /// See [crate documentation](mod@self) for more.
-    pub fn parse(&mut self, input: ParseStream<'_>) -> syn::Result<()> {
+    fn parse(&mut self, input: ParseStream<'_>) -> syn::Result<()> {
         let mut msg = String::new();
         for (ix, key) in self
             .map
@@ -537,7 +537,7 @@ impl<T: UnwrapIdent + ?Sized> UnwrapIdent for Arc<T> {
     }
 }
 
-/// Combinators.
+/// Wrap parsing functions so that they are e.g preceded by `=` or surrounded by `(..)`.
 pub mod with {
     use syn::{
         Token, braced, bracketed, parenthesized,
@@ -624,7 +624,7 @@ pub mod with {
     }
 }
 
-/// Leaf combinators acting on [`bool`]s and [`Option`]s
+/// Create [`Parser`]s that write to [`&mut Option<T>`](Option) or set [`bool`]s when they parse.
 pub mod set {
     use super::*;
 
@@ -666,7 +666,7 @@ pub mod set {
     }
 }
 
-/// Leaf combinator functions.
+/// Create [`Parser`]s that write to `&mut T` when they parse.
 pub mod on {
     use super::*;
 
