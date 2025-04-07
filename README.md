@@ -34,6 +34,7 @@ and [in the wild](https://serde.rs/attributes.html) tend to look like this:
   #[repr(align(128), C)]
 //  ^^^^ ^^^^^ ^^^   ^
 //  path  key (val)  bare key
+
   #[serde(rename_all = "kebab-case", untagged)]
 // ^^^^^^ ^^^^^^^^^^   ^^^^^^^^^^^^  ^^^^^^^^
 //  path     key     =      val      bare key
