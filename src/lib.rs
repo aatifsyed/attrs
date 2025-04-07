@@ -39,6 +39,7 @@
 //!   #[repr(align(128), C)]
 //! //  ^^^^ ^^^^^ ^^^   ^
 //! //  path  key (val)  bare key
+//!
 //!   #[serde(rename_all = "kebab-case", untagged)]
 //! // ^^^^^^ ^^^^^^^^^^   ^^^^^^^^^^^^  ^^^^^^^^
 //! //  path     key     =      val      bare key
