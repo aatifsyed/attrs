@@ -268,7 +268,7 @@ impl<'a> Attrs<'a> {
     /// Parse the entirety of input as a sequence of registered `key`s,
     /// followed by the appropriate combinator,
     /// separated by commas.
-    fn parse(&mut self, input: ParseStream<'_>) -> syn::Result<()> {
+    fn _parse(&mut self, input: ParseStream<'_>) -> syn::Result<()> {
         let mut msg = String::new();
         for (ix, key) in self
             .map
@@ -348,10 +348,10 @@ impl<'a> Attrs<'a> {
     }
 
     fn into_parser(mut self) -> impl FnMut(ParseStream<'_>) -> syn::Result<()> {
-        move |input| self.parse(input)
+        move |input| self._parse(input)
     }
     fn as_parser(&mut self) -> impl FnMut(ParseStream<'_>) -> syn::Result<()> {
-        |input| self.parse(input)
+        |input| self._parse(input)
     }
 }
 
