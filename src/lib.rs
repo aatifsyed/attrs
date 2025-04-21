@@ -50,7 +50,7 @@
 //! and register different `key`s, each with a parsing function.
 //!
 //! This library provides many parsing functions, but there are four key kinds:
-//! - [`bool`](set::bool) takes a `true` or `false` from the input.
+//! - [`lit`](set::lit) takes a literal like `true` or `100` from the input.
 //! - [`from_str`](set::from_str) takes a `".."` string from the input,
 //!   before trying to [`FromStr`] it into an object.
 //! - [`parse_str`](set::parse_str) takes a `".."` string from the input,
@@ -637,8 +637,9 @@ pub mod set {
         }
     }
     /// Parse a [`LitBool`] from `input`, assigning it to `dst` in [`Some`].
+    #[deprecated = "Use `set::lit` instead"]
     pub fn bool(dst: &mut Option<bool>) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
-        |input| parse::set::bool(dst, input)
+        |input| parse::set::lit(dst, input)
     }
     /// Parse a [`Parse`]-able from `input`, assigning it to `dst` in [`Some`].
     pub fn parse<T: Parse>(
@@ -665,6 +666,13 @@ pub mod set {
     ) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::set::parse_str(dst, input)
     }
+
+    /// Parse the appropriate [`syn::Lit`] from `input`,
+    /// extracting the value,
+    /// and assigning the result to `dst` in [`Some`].
+    pub fn lit<T: Lit>(dst: &mut Option<T>) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
+        |input| parse::set::lit(dst, input)
+    }
 }
 
 /// Create [`Parser`]s that write to `&mut T` when they parse.
@@ -672,8 +680,9 @@ pub mod on {
     use super::*;
 
     /// Parse a [`LitBool`], assigning its value to `dst`.
+    #[deprecated = "Use `on::lit` instead"]
     pub fn bool(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
-        |input| parse::bool(dst, input)
+        |input| parse::lit(dst, input)
     }
     /// Parse a [`Parse`]-able, assigning its value to `dst`.
     pub fn parse<T: Parse>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
@@ -694,6 +703,13 @@ pub mod on {
     pub fn parse_str<T: Parse>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::parse_str(dst, input)
     }
+
+    /// Parse the appropriate [`syn::Lit`] from `input`,
+    /// extracting the value,
+    /// and assigning the result to `dst`.
+    pub fn lit<T: Lit>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
+        |input| parse::lit(dst, input)
+    }
 }
 
 /// Straightforward parsing functions.
@@ -703,6 +719,7 @@ pub mod parse {
     use super::*;
 
     /// Parse a [`LitBool`] from `input`, assigning it to `dst`.
+    #[deprecated = "Use `parse::lit` instead"]
     pub fn bool(dst: &mut bool, input: ParseStream<'_>) -> syn::Result<()> {
         *dst = input.parse::<LitBool>()?.value;
         Ok(())
@@ -737,11 +754,20 @@ pub mod parse {
         Ok(())
     }
 
+    /// Parse the appropriate [`syn::Lit`] from `input`,
+    /// extracting the value,
+    /// and assigning the result to `dst`.
+    pub fn lit<T: Lit>(dst: &mut T, input: ParseStream<'_>) -> syn::Result<()> {
+        *dst = Lit::parse(input)?;
+        Ok(())
+    }
+
     /// Straightforward parsing functions that set [`Option`]s.
     pub mod set {
         use super::*;
 
         /// Parse a [`LitBool`] from `input`, assigning it to `dst` in [`Some`].
+        #[deprecated = "Use `parse::set::lit` instead"]
         pub fn bool(dst: &mut Option<bool>, input: ParseStream<'_>) -> syn::Result<()> {
             *dst = Some(input.parse::<LitBool>()?.value);
             Ok(())
@@ -774,5 +800,108 @@ pub mod parse {
             *dst = Some(input.parse::<LitStr>()?.parse()?);
             Ok(())
         }
+
+        /// Parse the appropriate [`syn::Lit`] from `input`,
+        /// extracting the value,
+        /// and assigning the result to `dst` in [`Some`].
+        pub fn lit<T: Lit>(dst: &mut Option<T>, input: ParseStream<'_>) -> syn::Result<()> {
+            *dst = Some(Lit::parse(input)?);
+            Ok(())
+        }
+    }
+}
+
+/// A value that can be parsed by this crate from a [`syn::Lit`].
+///
+/// This trait is sealed, and cannot be implemented for types outside this crate.
+pub trait Lit: Sized + sealed::Sealed {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self>;
+}
+
+mod sealed {
+    pub trait Sealed {}
+    macro_rules! sealed {
+            ($($ty:ty),* $(,)?) => {
+                $(impl Sealed for $ty {})*
+            };
+        }
+    sealed! {
+        u8, u16, u32, u64, u128, usize,
+        i8, i16, i32, i64, i128, isize,
+        f32, f64,
+        bool,
+        char,
+        String,
+        Vec<u8>,
+    }
+}
+
+macro_rules! num {
+        ($($via:ty {
+            $($ty:ty),* $(,)?
+        } )*) => {
+            $(
+                $(
+                    impl Lit for $ty {
+                        fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+                            let lit = input.parse::<$via>()?;
+                            match lit.suffix() {
+                                "" | stringify!($ty) => lit.base10_parse(),
+                                _ => Err(syn::Error::new(
+                                    lit.span(),
+                                    concat!("Expected suffix `", stringify!($ty), "`"),
+                                )),
+                            }
+                        }
+                    }
+                )*
+            )*
+        };
+    }
+
+num! {
+    syn::LitInt {
+            u16, u32, u64, u128, usize,
+        i8, i16, i32, i64, i128, isize,
+    }
+    syn::LitFloat {
+        f32, f64
+    }
+}
+
+impl Lit for u8 {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        match input.parse::<syn::Lit>()? {
+            syn::Lit::Byte(it) => Ok(it.value()),
+            syn::Lit::Int(it) => match it.suffix() {
+                "" | "u8" => it.base10_parse(),
+                _ => Err(syn::Error::new(it.span(), "Expected suffix `u8`")),
+            },
+            other => Err(syn::Error::new(
+                other.span(),
+                "Expected a u8 or byte literal",
+            )),
+        }
+    }
+}
+
+impl Lit for bool {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(input.parse::<syn::LitBool>()?.value())
+    }
+}
+impl Lit for String {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(input.parse::<syn::LitStr>()?.value())
+    }
+}
+impl Lit for Vec<u8> {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(input.parse::<syn::LitByteStr>()?.value())
+    }
+}
+impl Lit for char {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(input.parse::<syn::LitChar>()?.value())
     }
 }
