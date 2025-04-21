@@ -44,7 +44,7 @@ To use this library, create an [`Attrs`],
 and register different `key`s, each with a parsing function.
 
 This library provides many parsing functions, but there are four key kinds:
-- [`bool`](set::bool) takes a `true` or `false` from the input.
+- [`lit`](set::lit) takes a literal like `true` or `100` from the input.
 - [`from_str`](set::from_str) takes a `".."` string from the input,
   before trying to [`FromStr`] it into an object.
 - [`parse_str`](set::parse_str) takes a `".."` string from the input,
