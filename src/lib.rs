@@ -362,14 +362,26 @@ enum Attr<'a> {
 }
 
 impl fmt::Debug for Attr<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Attr").finish_non_exhaustive()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AliasFor(it) => f.debug_tuple("AliasFor").field(it).finish(),
+            Self::Once(it) => f.debug_tuple("Once").field(it).finish(),
+            Self::Many(_) => f.debug_tuple("Many").finish_non_exhaustive(),
+        }
     }
 }
 
 enum Once<'a> {
     Some(Box<dyn 'a + FnOnce(ParseStream<'_>) -> syn::Result<()>>),
     Already(Span),
+}
+impl fmt::Debug for Once<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Some(_) => f.debug_tuple("Some").finish_non_exhaustive(),
+            Self::Already(span) => f.debug_tuple("Already").field(span).finish(),
+        }
+    }
 }
 
 /// Borrow from this object as a [`Parser`].
