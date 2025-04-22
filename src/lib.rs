@@ -625,17 +625,13 @@ pub mod with {
     }
 }
 
-/// Create [`Parser`]s that write to [`&mut Option<T>`](Option) or set [`bool`]s when they parse.
+/// Create [`Parser`]s that write to [`&mut Option<T>`](Option).
 pub mod set {
     use super::*;
 
-    /// Ignores the input, and just sets `dst` to `true`.
-    pub fn flag(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
-        |_| {
-            *dst = true;
-            Ok(())
-        }
-    }
+    #[deprecated = "use `flag::free` instead"]
+    pub use flag::free as flag;
+
     /// Parse a [`LitBool`] from `input`, assigning it to `dst` in [`Some`].
     #[deprecated = "Use `set::lit` instead"]
     pub fn bool(dst: &mut Option<bool>) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
@@ -709,6 +705,41 @@ pub mod on {
     /// and assigning the result to `dst`.
     pub fn lit<T: Lit>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::lit(dst, input)
+    }
+}
+
+pub mod flag {
+    use syn::token;
+
+    use super::*;
+
+    /// Ignores the input, and just sets `dst` to `true`.
+    pub fn free(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
+        |_| {
+            *dst = true;
+            Ok(())
+        }
+    }
+    /// Accept `key` or `key = true`
+    pub fn or_eq(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
+        |input| match input.peek(Token![=]) {
+            true => with::eq(on::lit(dst))(input),
+            false => free(dst)(input),
+        }
+    }
+    /// Accept `key` or `key(true)`
+    pub fn or_paren(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
+        |input| match input.peek(token::Paren) {
+            true => with::paren(on::lit(dst))(input),
+            false => free(dst)(input),
+        }
+    }
+    /// Accept `key`, `key = true` or `key(true)`
+    pub fn or_peq(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
+        |input| match input.peek(Token![=]) || input.peek(token::Paren) {
+            true => with::peq(on::lit(dst))(input),
+            false => free(dst)(input),
+        }
     }
 }
 
