@@ -342,7 +342,7 @@ impl<'a> Attrs<'a> {
     fn insert(&mut self, key: impl UnwrapIdent, val: Attr<'a>) -> &mut Self {
         match self.map.entry(key.unwrap_ident()) {
             Entry::Vacant(it) => it.insert(val),
-            Entry::Occupied(it) => panic!("duplicate entry for key {}", it.key()),
+            Entry::Occupied(it) => panic!("duplicate entry for key `{}`", it.key()),
         };
         self
     }
@@ -644,20 +644,59 @@ pub mod set {
     #[deprecated = "use `flag::free` instead"]
     pub use flag::free as flag;
 
-    /// Parse a [`LitBool`] from `input`, assigning it to `dst` in [`Some`].
+    /// Parse a [`LitBool`], assigning it to `dst` in [`Some`].
+    ///
+    /// ```
+    /// #![expect(deprecated)]
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = None;
+    /// Attrs::new()
+    ///     .once("key", with::eq(set::bool(&mut val)))
+    ///     .parse2(quote!(key = true))?;
+    /// assert_eq!(val, Some(true));
+    /// # Ok(()) }
+    /// ```
     #[deprecated = "Use `set::lit` instead"]
     pub fn bool(dst: &mut Option<bool>) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::set::lit(dst, input)
     }
-    /// Parse a [`Parse`]-able from `input`, assigning it to `dst` in [`Some`].
+    /// Parse a [`Parse`]-able, assigning it to `dst` in [`Some`].
+    ///
+    /// You should take care that the [`Parse`] does not advance into subsequent keys,
+    /// else use [`parse_str`] instead.
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # use proc_macro2::{Span, Ident};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = None::<Ident>;
+    /// Attrs::new()
+    ///     .once("key", with::eq(set::parse(&mut val)))
+    ///     .parse2(quote!(key = Value))?;
+    /// assert_eq!(val, Some(Ident::new("Value", Span::call_site())));
+    /// # Ok(()) }
+    /// ```
     pub fn parse<T: Parse>(
         dst: &mut Option<T>,
     ) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::set::parse(dst, input)
     }
-    /// 1. Parse a [`LitStr`] from `input`.
+    /// 1. Parse a [`LitStr`].
     /// 2. Parse the contents of that string using [`FromStr`].
     /// 3. Assign the result to `dst` in [`Some`].
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # use core::net::Ipv4Addr;
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = None::<Ipv4Addr>;
+    /// Attrs::new()
+    ///     .once("key", with::eq(set::from_str(&mut val)))
+    ///     .parse2(quote!(key = "127.0.0.1"))?;
+    /// assert_eq!(val, Some(Ipv4Addr::LOCALHOST));
+    /// # Ok(()) }
+    /// ```
     pub fn from_str<T: FromStr>(
         dst: &mut Option<T>,
     ) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()>
@@ -666,18 +705,72 @@ pub mod set {
     {
         |input| parse::set::from_str(dst, input)
     }
-    /// 1. Parse a [`LitStr`] from `input`.
+    /// 1. Parse a [`LitStr`].
     /// 2. Parse the contents of that string into the [`Parse`]-able.
     /// 3. Assign the result to `dst` in [`Some`].
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # use proc_macro2::{Span, Ident};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = None::<Ident>;
+    /// Attrs::new()
+    ///     .once("key", with::eq(set::parse_str(&mut val)))
+    ///     .parse2(quote!(key = "Value"))?;
+    /// assert_eq!(val, Some(Ident::new("Value", Span::call_site())));
+    /// # Ok(()) }
+    /// ```
     pub fn parse_str<T: Parse>(
         dst: &mut Option<T>,
     ) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::set::parse_str(dst, input)
     }
 
-    /// Parse the appropriate [`syn::Lit`] from `input`,
+    /// Parse the appropriate [`syn::Lit`],
     /// extracting the value,
     /// and assigning the result to `dst` in [`Some`].
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # use proc_macro2::{Span, Ident};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut byte = None::<u8>;
+    /// let mut usize = None::<usize>;
+    /// let mut isize = None::<isize>;
+    /// let mut float = None::<f32>;
+    /// let mut bool = None::<bool>;
+    /// let mut char = None::<char>;
+    /// let mut string = None::<String>;
+    /// let mut bytes = None::<Vec<u8>>;
+    /// Attrs::new()
+    ///     .once("byte", with::eq(set::lit(&mut byte)))
+    ///     .once("usize", with::eq(set::lit(&mut usize)))
+    ///     .once("isize", with::eq(set::lit(&mut isize)))
+    ///     .once("float", with::eq(set::lit(&mut float)))
+    ///     .once("bool", with::eq(set::lit(&mut bool)))
+    ///     .once("char", with::eq(set::lit(&mut char)))
+    ///     .once("string", with::eq(set::lit(&mut string)))
+    ///     .once("bytes", with::eq(set::lit(&mut bytes)))
+    ///     .parse2(quote! {
+    ///         byte = b'A',
+    ///         usize = 123,
+    ///         isize = -456,
+    ///         float = 7.89,
+    ///         bool = false,
+    ///         char = '𓀀',
+    ///         string = "hello",
+    ///         bytes = b"world",
+    ///     })?;
+    /// assert_eq!(byte, Some(b'A'));
+    /// assert_eq!(usize, Some(123));
+    /// assert_eq!(isize, Some(-456));
+    /// assert_eq!(float, Some(7.89));
+    /// assert_eq!(bool, Some(false));
+    /// assert_eq!(char, Some('𓀀'));
+    /// assert_eq!(string, Some(String::from("hello")));
+    /// assert_eq!(bytes, Some(Vec::from(b"world")));
+    /// # Ok(()) }
+    /// ```
     pub fn lit<T: Lit>(dst: &mut Option<T>) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::set::lit(dst, input)
     }
@@ -688,17 +781,55 @@ pub mod on {
     use super::*;
 
     /// Parse a [`LitBool`], assigning its value to `dst`.
+    ///
+    /// ```
+    /// #![expect(deprecated)]
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = false;
+    /// Attrs::new()
+    ///     .once("key", with::eq(on::bool(&mut val)))
+    ///     .parse2(quote!(key = true))?;
+    /// assert!(val);
+    /// # Ok(()) }
     #[deprecated = "Use `on::lit` instead"]
     pub fn bool(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::lit(dst, input)
     }
     /// Parse a [`Parse`]-able, assigning its value to `dst`.
+    ///
+    /// You should take care that the [`Parse`] does not advance into subsequent keys,
+    /// else use [`parse_str`] instead.
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # use proc_macro2::{Span, Ident};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = Ident::new("Default", Span::call_site());
+    /// Attrs::new()
+    ///     .once("key", with::eq(on::parse(&mut val)))
+    ///     .parse2(quote!(key = Override))?;
+    /// assert_eq!(val, Ident::new("Override", Span::call_site()));
+    /// # Ok(()) }
+    /// ```
     pub fn parse<T: Parse>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::parse(dst, input)
     }
     /// 1. Parse a [`LitStr`].
     /// 2. Parse the contents of that string using [`FromStr`].
     /// 3. Assign the result to `dst`.
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # use core::net::Ipv4Addr;
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = Ipv4Addr::BROADCAST;
+    /// Attrs::new()
+    ///     .once("key", with::eq(on::from_str(&mut val)))
+    ///     .parse2(quote!(key = "127.0.0.1"))?;
+    /// assert_eq!(val, Ipv4Addr::LOCALHOST);
+    /// # Ok(()) }
+    /// ```
     pub fn from_str<T: FromStr>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()>
     where
         T::Err: Display,
@@ -708,6 +839,18 @@ pub mod on {
     /// 1. Parse a [`LitStr`].
     /// 2. Parse the contents of that string into the [`Parse`]-able.
     /// 3. Assign the result to `dst`.
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # use proc_macro2::{Span, Ident};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = Ident::new("Default", Span::call_site());
+    /// Attrs::new()
+    ///     .once("key", with::eq(on::parse_str(&mut val)))
+    ///     .parse2(quote!(key = "Override"))?;
+    /// assert_eq!(val, Ident::new("Override", Span::call_site()));
+    /// # Ok(()) }
+    /// ```
     pub fn parse_str<T: Parse>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::parse_str(dst, input)
     }
@@ -715,17 +858,71 @@ pub mod on {
     /// Parse the appropriate [`syn::Lit`] from `input`,
     /// extracting the value,
     /// and assigning the result to `dst`.
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # use proc_macro2::{Span, Ident};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut byte = 0u8;
+    /// let mut usize = 0usize;
+    /// let mut isize = 0isize;
+    /// let mut float = 0.0f32;
+    /// let mut bool = false;
+    /// let mut char = 'a';
+    /// let mut string = String::new();
+    /// let mut bytes = Vec::new();
+    /// Attrs::new()
+    ///     .once("byte", with::eq(on::lit(&mut byte)))
+    ///     .once("usize", with::eq(on::lit(&mut usize)))
+    ///     .once("isize", with::eq(on::lit(&mut isize)))
+    ///     .once("float", with::eq(on::lit(&mut float)))
+    ///     .once("bool", with::eq(on::lit(&mut bool)))
+    ///     .once("char", with::eq(on::lit(&mut char)))
+    ///     .once("string", with::eq(on::lit(&mut string)))
+    ///     .once("bytes", with::eq(on::lit(&mut bytes)))
+    ///     .parse2(quote! {
+    ///         byte = b'A',
+    ///         usize = 123,
+    ///         isize = -456,
+    ///         float = 7.89,
+    ///         bool = false,
+    ///         char = '𓀀',
+    ///         string = "hello",
+    ///         bytes = b"world",
+    ///     })?;
+    /// assert_eq!(byte, b'A');
+    /// assert_eq!(usize, 123);
+    /// assert_eq!(isize, -456);
+    /// assert_eq!(float, 7.89);
+    /// assert_eq!(bool, false);
+    /// assert_eq!(char, '𓀀');
+    /// assert_eq!(string, "hello");
+    /// assert_eq!(bytes, b"world");
+    /// # Ok(()) }
+    /// ```
     pub fn lit<T: Lit>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::lit(dst, input)
     }
 }
 
+/// Create [`Parser`]s which set [`bool`]s.
 pub mod flag {
     use syn::token;
 
     use super::*;
 
     /// Ignores the input, and just sets `dst` to `true`.
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val = false;
+    /// Attrs::new()
+    ///     .once("bare", flag::free(&mut val))
+    ///     .parse2(quote!(bare))?;
+    /// assert!(val);
+    /// # Ok(()) }
+    /// ```
     pub fn free(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |_| {
             *dst = true;
@@ -733,6 +930,20 @@ pub mod flag {
         }
     }
     /// Accept `key` or `key = true`
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val1 = false;
+    /// let mut val2 = true;
+    /// Attrs::new()
+    ///     .once("bare", flag::or_eq(&mut val1))
+    ///     .once("explicit", flag::or_eq(&mut val2))
+    ///     .parse2(quote!(bare, explicit = false))?;
+    /// assert!(val1);
+    /// assert!(!val2);
+    /// # Ok(()) }
+    /// ```
     pub fn or_eq(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| match input.peek(Token![=]) {
             true => with::eq(on::lit(dst))(input),
@@ -740,6 +951,20 @@ pub mod flag {
         }
     }
     /// Accept `key` or `key(true)`
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val1 = false;
+    /// let mut val2 = true;
+    /// Attrs::new()
+    ///     .once("bare", flag::or_paren(&mut val1))
+    ///     .once("explicit", flag::or_paren(&mut val2))
+    ///     .parse2(quote!(bare, explicit(false)))?;
+    /// assert!(val1);
+    /// assert!(!val2);
+    /// # Ok(()) }
+    /// ```
     pub fn or_paren(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| match input.peek(token::Paren) {
             true => with::paren(on::lit(dst))(input),
@@ -747,6 +972,22 @@ pub mod flag {
         }
     }
     /// Accept `key`, `key = true` or `key(true)`
+    ///
+    /// ```
+    /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut val1 = false;
+    /// let mut val2 = true;
+    /// let mut val3 = true;
+    /// Attrs::new()
+    ///     .once("bare", flag::or_peq(&mut val1))
+    ///     .once("eq", flag::or_peq(&mut val2))
+    ///     .once("paren", flag::or_peq(&mut val3))
+    ///     .parse2(quote!(bare, eq = false, paren(false)))?;
+    /// assert!(val1);
+    /// assert!(!val2);
+    /// assert!(!val3);
+    /// # Ok(()) }
     pub fn or_peq(dst: &mut bool) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| match input.peek(Token![=]) || input.peek(token::Paren) {
             true => with::peq(on::lit(dst))(input),
@@ -856,6 +1097,8 @@ pub mod parse {
 
 /// A value that can be parsed by this crate from a [`syn::Lit`].
 ///
+/// See [`set::lit`] and [`on::lit`] for usage examples.
+///
 /// This trait is sealed, and cannot be implemented for types outside this crate.
 pub trait Lit: Sized + sealed::Sealed {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self>;
@@ -913,6 +1156,7 @@ num! {
 }
 
 impl Lit for u8 {
+    /// Note that bytes may parsed from a [`LitInt`](syn::LitInt) or a [`LitByte`](syn::LitByte).
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         match input.parse::<syn::Lit>()? {
             syn::Lit::Byte(it) => Ok(it.value()),
