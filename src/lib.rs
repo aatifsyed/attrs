@@ -651,9 +651,11 @@ pub mod set {
     /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
     /// # fn main() -> syn::Result<()> {
     /// let mut val = None;
+    ///
     /// Attrs::new()
     ///     .once("key", with::eq(set::bool(&mut val)))
     ///     .parse2(quote!(key = true))?;
+    ///
     /// assert_eq!(val, Some(true));
     /// # Ok(()) }
     /// ```
@@ -671,9 +673,11 @@ pub mod set {
     /// # use proc_macro2::{Span, Ident};
     /// # fn main() -> syn::Result<()> {
     /// let mut val = None::<Ident>;
+    ///
     /// Attrs::new()
     ///     .once("key", with::eq(set::parse(&mut val)))
     ///     .parse2(quote!(key = Value))?;
+    ///
     /// assert_eq!(val, Some(Ident::new("Value", Span::call_site())));
     /// # Ok(()) }
     /// ```
@@ -691,9 +695,11 @@ pub mod set {
     /// # use core::net::Ipv4Addr;
     /// # fn main() -> syn::Result<()> {
     /// let mut val = None::<Ipv4Addr>;
+    ///
     /// Attrs::new()
     ///     .once("key", with::eq(set::from_str(&mut val)))
     ///     .parse2(quote!(key = "127.0.0.1"))?;
+    ///
     /// assert_eq!(val, Some(Ipv4Addr::LOCALHOST));
     /// # Ok(()) }
     /// ```
@@ -714,9 +720,11 @@ pub mod set {
     /// # use proc_macro2::{Span, Ident};
     /// # fn main() -> syn::Result<()> {
     /// let mut val = None::<Ident>;
+    ///
     /// Attrs::new()
     ///     .once("key", with::eq(set::parse_str(&mut val)))
     ///     .parse2(quote!(key = "Value"))?;
+    ///
     /// assert_eq!(val, Some(Ident::new("Value", Span::call_site())));
     /// # Ok(()) }
     /// ```
@@ -742,6 +750,7 @@ pub mod set {
     /// let mut char = None::<char>;
     /// let mut string = None::<String>;
     /// let mut bytes = None::<Vec<u8>>;
+    ///
     /// Attrs::new()
     ///     .once("byte", with::eq(set::lit(&mut byte)))
     ///     .once("usize", with::eq(set::lit(&mut usize)))
@@ -761,6 +770,7 @@ pub mod set {
     ///         string = "hello",
     ///         bytes = b"world",
     ///     })?;
+    ///
     /// assert_eq!(byte, Some(b'A'));
     /// assert_eq!(usize, Some(123));
     /// assert_eq!(isize, Some(-456));
@@ -787,9 +797,11 @@ pub mod on {
     /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
     /// # fn main() -> syn::Result<()> {
     /// let mut val = false;
+    ///
     /// Attrs::new()
     ///     .once("key", with::eq(on::bool(&mut val)))
     ///     .parse2(quote!(key = true))?;
+    ///
     /// assert!(val);
     /// # Ok(()) }
     #[deprecated = "Use `on::lit` instead"]
@@ -806,9 +818,11 @@ pub mod on {
     /// # use proc_macro2::{Span, Ident};
     /// # fn main() -> syn::Result<()> {
     /// let mut val = Ident::new("Default", Span::call_site());
+    ///
     /// Attrs::new()
     ///     .once("key", with::eq(on::parse(&mut val)))
     ///     .parse2(quote!(key = Override))?;
+    ///
     /// assert_eq!(val, Ident::new("Override", Span::call_site()));
     /// # Ok(()) }
     /// ```
@@ -824,9 +838,11 @@ pub mod on {
     /// # use core::net::Ipv4Addr;
     /// # fn main() -> syn::Result<()> {
     /// let mut val = Ipv4Addr::BROADCAST;
+    ///
     /// Attrs::new()
     ///     .once("key", with::eq(on::from_str(&mut val)))
     ///     .parse2(quote!(key = "127.0.0.1"))?;
+    ///
     /// assert_eq!(val, Ipv4Addr::LOCALHOST);
     /// # Ok(()) }
     /// ```
@@ -845,9 +861,11 @@ pub mod on {
     /// # use proc_macro2::{Span, Ident};
     /// # fn main() -> syn::Result<()> {
     /// let mut val = Ident::new("Default", Span::call_site());
+    ///
     /// Attrs::new()
     ///     .once("key", with::eq(on::parse_str(&mut val)))
     ///     .parse2(quote!(key = "Override"))?;
+    ///
     /// assert_eq!(val, Ident::new("Override", Span::call_site()));
     /// # Ok(()) }
     /// ```
@@ -871,6 +889,7 @@ pub mod on {
     /// let mut char = 'a';
     /// let mut string = String::new();
     /// let mut bytes = Vec::new();
+    ///
     /// Attrs::new()
     ///     .once("byte", with::eq(on::lit(&mut byte)))
     ///     .once("usize", with::eq(on::lit(&mut usize)))
@@ -890,6 +909,7 @@ pub mod on {
     ///         string = "hello",
     ///         bytes = b"world",
     ///     })?;
+    ///
     /// assert_eq!(byte, b'A');
     /// assert_eq!(usize, 123);
     /// assert_eq!(isize, -456);
@@ -917,9 +937,11 @@ pub mod flag {
     /// # use {attrs::*, syn::parse::Parser as _, quote::quote};
     /// # fn main() -> syn::Result<()> {
     /// let mut val = false;
+    ///
     /// Attrs::new()
     ///     .once("bare", flag::free(&mut val))
     ///     .parse2(quote!(bare))?;
+    ///
     /// assert!(val);
     /// # Ok(()) }
     /// ```
@@ -936,10 +958,12 @@ pub mod flag {
     /// # fn main() -> syn::Result<()> {
     /// let mut val1 = false;
     /// let mut val2 = true;
+    ///
     /// Attrs::new()
     ///     .once("bare", flag::or_eq(&mut val1))
     ///     .once("explicit", flag::or_eq(&mut val2))
     ///     .parse2(quote!(bare, explicit = false))?;
+    ///
     /// assert!(val1);
     /// assert!(!val2);
     /// # Ok(()) }
@@ -957,10 +981,12 @@ pub mod flag {
     /// # fn main() -> syn::Result<()> {
     /// let mut val1 = false;
     /// let mut val2 = true;
+    ///
     /// Attrs::new()
     ///     .once("bare", flag::or_paren(&mut val1))
     ///     .once("explicit", flag::or_paren(&mut val2))
     ///     .parse2(quote!(bare, explicit(false)))?;
+    ///
     /// assert!(val1);
     /// assert!(!val2);
     /// # Ok(()) }
@@ -979,11 +1005,13 @@ pub mod flag {
     /// let mut val1 = false;
     /// let mut val2 = true;
     /// let mut val3 = true;
+    ///
     /// Attrs::new()
     ///     .once("bare", flag::or_peq(&mut val1))
     ///     .once("eq", flag::or_peq(&mut val2))
     ///     .once("paren", flag::or_peq(&mut val3))
     ///     .parse2(quote!(bare, eq = false, paren(false)))?;
+    ///
     /// assert!(val1);
     /// assert!(!val2);
     /// assert!(!val3);
