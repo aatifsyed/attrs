@@ -69,12 +69,7 @@
 //! You may choose to accept a `key` [`once`](Attrs::once) or [`many`](Attrs::many) times,
 //! and you can, of course, write your own parsing functions for whatever syntax you have in mind.
 
-use core::{
-    fmt::Display,
-    fmt::{self, Write as _},
-    mem,
-    str::FromStr,
-};
+use core::{fmt, fmt::Display, mem, str::FromStr};
 use std::{
     borrow::Cow,
     collections::{BTreeMap, btree_map::Entry},
@@ -112,9 +107,25 @@ use syn::{
 /// assert!(krate.is_some() && untagged);
 /// # Ok(()) }
 /// ```
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct Attrs<'a> {
     map: BTreeMap<Ident, Attr<'a>>,
+    #[expect(clippy::type_complexity)]
+    fallback: Option<Box<dyn 'a + FnMut(&Ident, ParseStream<'_>) -> syn::Result<()>>>,
+}
+impl fmt::Debug for Attrs<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Attrs")
+            .field("map", &self.map)
+            .field(
+                "fallback",
+                &match self.fallback {
+                    Some(_) => "Some(..)",
+                    None => "None",
+                },
+            )
+            .finish()
+    }
 }
 
 impl<'a> Attrs<'a> {
@@ -159,6 +170,34 @@ impl<'a> Attrs<'a> {
         F: 'a + FnMut(ParseStream<'_>) -> syn::Result<()>,
     {
         self.insert(key, Attr::Many(Box::new(f)))
+    }
+    /// Parse unrecognised keys using `f`.
+    ///
+    /// ```
+    /// # fn main() -> syn::Result<()> {
+    /// # use attrs::*;
+    /// let mut krate = None::<syn::Path>;
+    ///
+    /// let parseme: syn::Attribute = syn::parse_quote! {
+    ///     #[serde(crate = "path::to::serde")]
+    /// };
+    ///
+    /// parseme.parse_args_with(Attrs::new().fallback(|key, input| {
+    ///     assert_eq!(key, "crate");
+    ///     input.parse::<syn::Token![=]>()?;
+    ///     krate = Some(input.parse::<syn::LitStr>()?.parse()?);
+    ///     Ok(())
+    /// }))?;
+    ///
+    /// assert!(krate.is_some());
+    /// # Ok(()) }
+    /// ```
+    pub fn fallback<F>(&mut self, f: F) -> &mut Self
+    where
+        F: 'a + FnMut(&Ident, ParseStream<'_>) -> syn::Result<()>,
+    {
+        self.fallback = Some(Box::new(f));
+        self
     }
     /// If the key `alias` is encountered, call the parser for `key`.
     ///
@@ -269,25 +308,24 @@ impl<'a> Attrs<'a> {
     /// followed by the appropriate combinator,
     /// separated by commas.
     fn _parse(&mut self, input: ParseStream<'_>) -> syn::Result<()> {
-        let mut msg = String::new();
-        for (ix, key) in self
-            .map
-            .iter()
-            .filter_map(|(k, v)| match v {
-                Attr::AliasFor(_) => None,
-                Attr::Once(_) | Attr::Many(_) => Some(k),
-            })
-            .enumerate()
-        {
-            match ix == 0 {
-                true => write!(msg, "Expected one of `{key}`").unwrap(),
-                false => write!(msg, ", `{key}`").unwrap(),
-            }
-        }
-        let msg = match msg.is_empty() {
-            true => String::from("This parser accepts no arguments"),
-            false => msg,
+        let msg = Phrase {
+            many: "Expected one of",
+            one: "Expected",
+            none: match &self.fallback {
+                Some(_) => "No explicit arguments specified",
+                None => "No arguments accepted",
+            },
+            conjunction: "or",
+            iter: self
+                .map
+                .iter()
+                .filter_map(|(k, v)| match v {
+                    Attr::AliasFor(_) => None,
+                    Attr::Once(_) | Attr::Many(_) => Some(k.clone()),
+                })
+                .collect::<Vec<_>>(),
         };
+        // parse input
         loop {
             if input.is_empty() {
                 break;
@@ -295,16 +333,17 @@ impl<'a> Attrs<'a> {
             match input.call(Ident::parse_any) {
                 Ok(it) => {
                     let mut key = it.unraw();
+                    // follow redirects
                     loop {
-                        match self.map.get_mut(&key) {
-                            Some(attr) => match attr {
-                                Attr::AliasFor(redirect) => key = redirect.clone(),
+                        break match (self.map.get_mut(&key), &mut self.fallback) {
+                            (Some(attr), _) => match attr {
+                                Attr::AliasFor(redirect) => {
+                                    key = redirect.clone();
+                                    continue;
+                                }
                                 Attr::Once(once) => {
                                     match mem::replace(once, Once::Already(it.span())) {
-                                        Once::Some(f) => {
-                                            f(input)?;
-                                            break;
-                                        }
+                                        Once::Some(f) => f(input)?,
                                         Once::Already(already) => {
                                             let mut e =
                                                 syn::Error::new(it.span(), "Duplicate argument");
@@ -316,13 +355,17 @@ impl<'a> Attrs<'a> {
                                         }
                                     }
                                 }
-                                Attr::Many(f) => {
-                                    f(input)?;
-                                    break;
+                                Attr::Many(f) => f(input)?,
+                            },
+                            (None, Some(fallback)) => match fallback(&key, input) {
+                                Ok(()) => {}
+                                Err(mut e) => {
+                                    e.combine(syn::Error::new(e.span(), msg));
+                                    return Err(e);
                                 }
                             },
-                            None => return Err(syn::Error::new(it.span(), msg)),
-                        }
+                            (None, None) => return Err(syn::Error::new(it.span(), msg)),
+                        };
                     }
                 }
                 Err(mut e) => {
@@ -1074,6 +1117,22 @@ pub mod parse {
         Ok(())
     }
 
+    /// Collect from `input` until a `,` is encountered.
+    pub fn until_comma(input: ParseStream<'_>) -> syn::Result<TokenStream> {
+        input.step(|cursor| {
+            let mut tokens = TokenStream::new();
+            let mut rest = *cursor;
+            while let Some((tt, cursor)) = rest.token_tree() {
+                rest = cursor;
+                match tt {
+                    proc_macro2::TokenTree::Punct(it) if it.as_char() == ',' => break,
+                    tt => tokens.extend([tt]),
+                };
+            }
+            Ok((tokens, rest))
+        })
+    }
+
     /// Straightforward parsing functions that set [`Option`]s.
     pub mod set {
         use super::*;
@@ -1218,5 +1277,50 @@ impl Lit for Vec<u8> {
 impl Lit for char {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         Ok(input.parse::<syn::LitChar>()?.value())
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Phrase<'a, I> {
+    /// `Expected one of`
+    pub many: &'a str,
+    /// `Expected`
+    pub one: &'a str,
+    /// `No registered keys`
+    pub none: &'a str,
+    /// `or`
+    pub conjunction: &'a str,
+    pub iter: I,
+}
+
+impl<I: Clone + IntoIterator> fmt::Display for Phrase<'_, I>
+where
+    I::Item: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            many,
+            one,
+            none,
+            conjunction,
+            iter,
+        } = self.clone();
+        let mut iter = iter.into_iter().peekable();
+        match iter.next() {
+            Some(first) => match iter.peek() {
+                Some(_) => {
+                    f.write_fmt(format_args!("{many} `{first}`"))?;
+                    while let Some(it) = iter.next() {
+                        match iter.peek() {
+                            Some(_) => f.write_fmt(format_args!(", `{it}`"))?,
+                            None => f.write_fmt(format_args!(" {conjunction} `{it}`"))?,
+                        }
+                    }
+                    Ok(())
+                }
+                None => f.write_fmt(format_args!("{one} `{first}`")),
+            },
+            None => f.write_str(none),
+        }
     }
 }
