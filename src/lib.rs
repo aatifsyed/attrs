@@ -777,6 +777,32 @@ pub mod set {
         |input| parse::set::parse_str(dst, input)
     }
 
+    /// If `input` contains a [`LitStr`],
+    /// then parse the contents of that string into the [`Parse`]-able in [`Some`].
+    /// Else, directly parse it from `input`.
+    ///
+    /// ```
+    /// # use {attrs::*, syn::{parse::Parser as _, parse_quote}, quote::quote};
+    /// # use proc_macro2::{Span, Ident};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut raw = None::<syn::Path>;
+    /// let mut str = None::<syn::Path>;
+    ///
+    /// Attrs::new()
+    ///     .once("raw", with::eq(set::maybe_str(&mut raw)))
+    ///     .once("str", with::eq(set::maybe_str(&mut str)))
+    ///     .parse2(quote!(raw = raw::path, str = "str::path"))?;
+    ///
+    /// assert_eq!(raw, Some(parse_quote!(raw::path)));
+    /// assert_eq!(str, Some(parse_quote!(str::path)));
+    /// # Ok(()) }
+    /// ```
+    pub fn maybe_str<T: Parse>(
+        dst: &mut Option<T>,
+    ) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
+        |input| parse::set::maybe_str(dst, input)
+    }
+
     /// Parse the appropriate [`syn::Lit`],
     /// extracting the value,
     /// and assigning the result to `dst` in [`Some`].
@@ -914,6 +940,29 @@ pub mod on {
     /// ```
     pub fn parse_str<T: Parse>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
         |input| parse::parse_str(dst, input)
+    }
+
+    /// If `input` contains a [`LitStr`],
+    /// then parse the contents of that string into the [`Parse`]-able.
+    /// Else, directly parse it from `input`.
+    ///
+    /// ```
+    /// # use {attrs::*, syn::{parse::Parser as _, parse_quote}, quote::quote};
+    /// # fn main() -> syn::Result<()> {
+    /// let mut raw: syn::Path = parse_quote!(default::path);
+    /// let mut str: syn::Path = parse_quote!(default::path);
+    ///
+    /// Attrs::new()
+    ///     .once("raw", with::eq(on::maybe_str(&mut raw)))
+    ///     .once("str", with::eq(on::maybe_str(&mut str)))
+    ///     .parse2(quote!(raw = raw::path, str = "str::path"))?;
+    ///
+    /// assert_eq!(raw, parse_quote!(raw::path));
+    /// assert_eq!(str, parse_quote!(str::path));
+    /// # Ok(()) }
+    /// ```
+    pub fn maybe_str<T: Parse>(dst: &mut T) -> impl '_ + FnMut(ParseStream<'_>) -> syn::Result<()> {
+        |input| parse::maybe_str(dst, input)
     }
 
     /// Parse the appropriate [`syn::Lit`] from `input`,
@@ -1108,7 +1157,16 @@ pub mod parse {
         *dst = T::parse.parse_str(&lit_str.value())?;
         Ok(())
     }
-
+    /// If `input` contains a [`LitStr`],
+    /// then parse the contents of that string into the [`Parse`]-able.
+    /// Else, directly parse it from `input`.
+    pub fn maybe_str<T: Parse>(dst: &mut T, input: ParseStream<'_>) -> syn::Result<()> {
+        *dst = match input.peek(LitStr) {
+            true => input.parse::<LitStr>()?.parse()?,
+            false => input.parse()?,
+        };
+        Ok(())
+    }
     /// Parse the appropriate [`syn::Lit`] from `input`,
     /// extracting the value,
     /// and assigning the result to `dst`.
@@ -1172,6 +1230,16 @@ pub mod parse {
             Ok(())
         }
 
+        /// If `input` contains a [`LitStr`],
+        /// then parse the contents of that string into the [`Parse`]-able in [`Some`].
+        /// Else, directly parse it from `input`.
+        pub fn maybe_str<T: Parse>(dst: &mut Option<T>, input: ParseStream<'_>) -> syn::Result<()> {
+            *dst = Some(match input.peek(LitStr) {
+                true => input.parse::<LitStr>()?.parse()?,
+                false => input.parse()?,
+            });
+            Ok(())
+        }
         /// Parse the appropriate [`syn::Lit`] from `input`,
         /// extracting the value,
         /// and assigning the result to `dst` in [`Some`].
