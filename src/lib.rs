@@ -1274,6 +1274,7 @@ mod sealed {
         char,
         String,
         Vec<u8>,
+        std::ffi::CString,
     }
 }
 
@@ -1345,6 +1346,11 @@ impl Lit for Vec<u8> {
 impl Lit for char {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         Ok(input.parse::<syn::LitChar>()?.value())
+    }
+}
+impl Lit for std::ffi::CString {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(input.parse::<syn::LitCStr>()?.value())
     }
 }
 
