@@ -72,16 +72,16 @@
 use core::{fmt, fmt::Display, mem, str::FromStr};
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, btree_map::Entry},
+    collections::{btree_map::Entry, BTreeMap},
     rc::Rc,
     sync::Arc,
 };
 
 use proc_macro2::{Span, TokenStream};
 use syn::{
-    Attribute, Ident, LitBool, LitStr, Token,
     ext::IdentExt as _,
     parse::{Parse, ParseStream, Parser},
+    Attribute, Ident, LitBool, LitStr, Token,
 };
 
 /// Ergonomic [`Parser`] for `#[attributes]`.
@@ -390,10 +390,10 @@ impl<'a> Attrs<'a> {
         self
     }
 
-    fn into_parser(mut self) -> impl FnMut(ParseStream<'_>) -> syn::Result<()> {
+    fn into_parser(mut self) -> impl FnMut(ParseStream<'_>) -> syn::Result<()> + use<'a> {
         move |input| self._parse(input)
     }
-    fn as_parser(&mut self) -> impl FnMut(ParseStream<'_>) -> syn::Result<()> {
+    fn as_parser(&mut self) -> impl FnMut(ParseStream<'_>) -> syn::Result<()> + use<'_, 'a> {
         |input| self._parse(input)
     }
 }
@@ -596,9 +596,9 @@ impl<T: UnwrapIdent + ?Sized> UnwrapIdent for Arc<T> {
 /// Wrap parsing functions so that they are e.g preceded by `=` or surrounded by `(..)`.
 pub mod with {
     use syn::{
-        Token, braced, bracketed, parenthesized,
-        parse::{ParseStream, discouraged::AnyDelimiter},
-        token,
+        braced, bracketed, parenthesized,
+        parse::{discouraged::AnyDelimiter, ParseStream},
+        token, Token,
     };
 
     /// Take an `=` before appling `f`.

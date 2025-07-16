@@ -1,7 +1,7 @@
 [package]
 name = "attrs"
 version = "0.2.8"
-edition = "2024"
+edition = "2021"
 description = "An ergonomic parser library for `#[attributes]`, built on parser combinators."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/aatifsyed/attrs"
@@ -13,6 +13,7 @@ categories = [
     "development-tools::procedural-macro-helpers",
     "development-tools",
 ]
+rust-version = "1.83"
 
 [dependencies]
 proc-macro2 = { version = "1.0.94", default-features = false }
