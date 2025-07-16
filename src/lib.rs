@@ -1254,27 +1254,27 @@ pub mod parse {
 ///
 /// See [`set::lit`] and [`on::lit`] for usage examples.
 ///
-/// This trait is sealed, and cannot be implemented for types outside this crate.
-pub trait Lit: Sized + sealed::Sealed {
+/// ```
+/// # use syn::parse::ParseStream;
+/// /// Accept both `""` and `c""` string literal syntaxes.
+/// enum StringArg {
+///    CStr(syn::LitCStr),
+///    Str(syn::LitStr),
+/// }
+///
+/// impl attrs::Lit for StringArg {
+///     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+///         let result = if input.peek(syn::LitStr) {
+///             Self::Str(input.parse::<syn::LitStr>()?)
+///         } else {
+///             Self::CStr(input.parse::<syn::LitCStr>()?)
+///         };
+///         Ok(result)
+///     }
+/// }
+/// ```
+pub trait Lit: Sized {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self>;
-}
-
-mod sealed {
-    pub trait Sealed {}
-    macro_rules! sealed {
-            ($($ty:ty),* $(,)?) => {
-                $(impl Sealed for $ty {})*
-            };
-        }
-    sealed! {
-        u8, u16, u32, u64, u128, usize,
-        i8, i16, i32, i64, i128, isize,
-        f32, f64,
-        bool,
-        char,
-        String,
-        Vec<u8>,
-    }
 }
 
 macro_rules! num {
