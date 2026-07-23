@@ -17,7 +17,7 @@ rust-version = "1.83"
 
 [dependencies]
 proc-macro2 = { version = "1.0.94", default-features = false }
-syn = { version = ">= 2.0.100, <4", default-features = false, features = [
+syn = { version = ">=2.0.100, <4", default-features = false, features = [
     "parsing",
     "derive",
 ] }
